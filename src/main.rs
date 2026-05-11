@@ -33,7 +33,7 @@ __kernel void mine(__global const uint *challenge,__global const uint *difficult
 "#;
 
 #[repr(C)]
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 struct ResultBuffer {
     found: u32,
     nonce_lo: u32,
@@ -178,8 +178,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             diff_u32[i] = u32::from_be_bytes(diff_bytes[i*4..(i+1)*4].try_into().unwrap());
         }
         
-        challenge_buf.write(&chal_u32).enq()?;
-        difficulty_buf.write(&diff_u32).enq()?;
+        challenge_buf.write(&chal_u32[..]).enq()?;
+        difficulty_buf.write(&diff_u32[..]).enq()?;
 
         let found = Arc::new(AtomicBool::new(false));
         let challenge_changed = Arc::new(AtomicBool::new(false));
@@ -254,8 +254,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tx.set_gas(500_000);
             
             if let Ok((max_fee_per_gas, _)) = provider.estimate_eip1559_fees(None).await {
-                tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
-                tx.set_max_fee_per_gas(max_fee_per_gas + max_priority_fee_per_gas);
+                if let TypedTransaction::Eip1559(ref mut inner) = tx {
+                    inner.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
+                    inner.max_fee_per_gas = Some(max_fee_per_gas + max_priority_fee_per_gas);
+                } else {
+                    let mut req = Eip1559TransactionRequest::new()
+                        .to(tx.to().cloned().unwrap())
+                        .data(tx.data().cloned().unwrap())
+                        .max_priority_fee_per_gas(max_priority_fee_per_gas)
+                        .max_fee_per_gas(max_fee_per_gas + max_priority_fee_per_gas);
+                    if let Some(gas) = tx.gas() { req = req.gas(*gas); }
+                    tx = TypedTransaction::Eip1559(req);
+                }
             } else if let Ok(gas_price) = provider.get_gas_price().await {
                 tx.set_gas_price(gas_price + max_priority_fee_per_gas);
             }
