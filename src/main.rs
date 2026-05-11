@@ -274,44 +274,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             log_message(&format!("🚀 Broadcasting TX to {} RPC endpoints (Flashbots/MEV)...", clients.len()));
             
-            let mut handles = vec![];
             for client in &clients {
                 let tx_clone = tx.clone();
                 let client_clone = client.clone();
-                handles.push(tokio::spawn(async move {
-                    client_clone.send_transaction(tx_clone, None).await
-                }));
-            }
-
-            // Await the first successful response to log the hash
-            let mut primary_pending_tx = None;
-            for handle in handles {
-                if let Ok(Ok(pending_tx)) = handle.await {
-                    if primary_pending_tx.is_none() {
-                        log_message(&format!("✅ TX accepted by network! Hash: {:?}", pending_tx.tx_hash()));
-                        primary_pending_tx = Some(pending_tx);
-                    }
-                }
-            }
-            
-            if let Some(pending_tx) = primary_pending_tx {
-                log_message("Waiting for confirmation (non-blocking)...");
-                // We don't block the loop here, we spawn a task to wait for the receipt 
-                // so the miner can immediately start hashing the next challenge!
                 tokio::spawn(async move {
-                    match pending_tx.await {
-                        Ok(Some(receipt)) => {
-                            if receipt.status == Some(U64::from(1)) {
-                                log_message(&format!("💎 Successfully minted! Block: {:?}", receipt.block_number.unwrap_or_default()));
-                            } else {
-                                log_message("❌ TX Reverted. Someone else likely beat us to it.");
+                    match client_clone.send_transaction(tx_clone, None).await {
+                        Ok(pending_tx) => {
+                            log_message(&format!("✅ TX accepted by RPC! Hash: {:?}", pending_tx.tx_hash()));
+                            match pending_tx.await {
+                                Ok(Some(receipt)) => {
+                                    if receipt.status == Some(U64::from(1)) {
+                                        log_message(&format!("💎 Successfully minted! Block: {:?}", receipt.block_number.unwrap_or_default()));
+                                    } else {
+                                        log_message("❌ TX Reverted. Someone else likely beat us to it.");
+                                    }
+                                }
+                                _ => log_message("❌ TX confirmation failed to retrieve."),
                             }
                         }
-                        _ => log_message("❌ TX confirmation failed to retrieve."),
+                        Err(e) => {
+                            log_message(&format!("❌ TX send failed on this RPC: {:?}", e));
+                        }
                     }
                 });
-            } else {
-                log_message("❌ All RPCs failed to accept the transaction.");
             }
 
         } else {
