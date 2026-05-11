@@ -6,6 +6,8 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 use ethers::prelude::*;
+use ethers::types::transaction::eip2718::TypedTransaction;
+use ethers::types::transaction::eip1559::Eip1559TransactionRequest;
 use ocl::{ProQue, Buffer, flags};
 
 const CONTRACT_ADDRESS: &str = "0xAC7b5d06fa1e77D08aea40d46cB7C5923A87A0cc";
