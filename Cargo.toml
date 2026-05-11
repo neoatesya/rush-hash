@@ -1,0 +1,14 @@
+[package]
+name = "rush-hash"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+ethers = "2.0.14"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+dotenv = "0.15"
+rand = "0.8"
+num_cpus = "1.16"
+hex = "0.4"
+ocl = "0.19"
