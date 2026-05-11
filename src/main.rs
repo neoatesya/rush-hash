@@ -167,8 +167,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
         
-        log_message(&format!("Era: {} | Reward: {} HASH | Epoch: {}", state.0, ethers::utils::format_units(state.1, 18).unwrap_or_default(), state.5));
-        log_message(&format!("Challenge: 0x{} | Difficulty: {}", hex::encode(challenge), difficulty));
+        let epoch = state.5;
+        let chal_hex = hex::encode(challenge);
+        let chal_short = &chal_hex[..8];
+
+        log_message(&format!("Era: {} | Reward: {} HASH | Epoch: {}", state.0, ethers::utils::format_units(state.1, 18).unwrap_or_default(), epoch));
+        log_message(&format!("Challenge: 0x{} | Difficulty: {}", chal_hex, difficulty));
 
         let mut diff_bytes = [0u8; 32];
         difficulty.to_big_endian(&mut diff_bytes);
@@ -239,7 +243,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             if last_print.elapsed().as_secs_f64() > 2.0 {
                 let elapsed = start_time.elapsed().as_secs_f64();
-                print!("\r[Mining] {:.2} MH/s ({} hashes total)", (total_hashes as f64 / elapsed) / 1_000_000.0, total_hashes);
+                print!("\x1B[2K\r[Epoch {} | Chal: 0x{}..] {:.2} MH/s ({} hashes total)", 
+                    epoch, chal_short, (total_hashes as f64 / elapsed) / 1_000_000.0, total_hashes);
                 let _ = std::io::stdout().flush();
                 last_print = Instant::now();
             }
